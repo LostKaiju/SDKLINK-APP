@@ -76,6 +76,8 @@ android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
+    // Health Connect client (pulled in by the ROOK SDK) needs SDK extension 19
+    compileSdkExtension 19
 
     namespace "com.sdklinkapp"
     defaultConfig {

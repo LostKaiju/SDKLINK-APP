@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { Button, Field, Section, colors } from '../components/ui';
 import type { RookCredentials } from '../storage';
 
@@ -10,6 +10,7 @@ export function CredentialsScreen({
 }) {
   const [clientUUID, setClientUUID] = React.useState('');
   const [secret, setSecret] = React.useState('');
+  const [showSecret, setShowSecret] = React.useState(false);
 
   const canSave = clientUUID.trim().length > 0 && secret.trim().length > 0;
 
@@ -30,8 +31,17 @@ export function CredentialsScreen({
           label="Secret key"
           value={secret}
           onChangeText={setSecret}
-          secureTextEntry
+          secureTextEntry={!showSecret}
         />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setShowSecret(prev => !prev)}
+          style={styles.toggle}
+        >
+          <Text style={styles.toggleText}>
+            {showSecret ? 'Hide secret key' : 'Show secret key'}
+          </Text>
+        </Pressable>
         <Button
           title="Save and initialize SDK"
           disabled={!canSave}
@@ -52,4 +62,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 16,
   },
+  toggle: { alignSelf: 'flex-start', paddingVertical: 4 },
+  toggleText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
 });

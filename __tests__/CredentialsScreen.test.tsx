@@ -7,7 +7,7 @@ import { TextInput } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { CredentialsScreen } from '../src/screens/CredentialsScreen';
 
-test('the secret key can be shown and hidden again', async () => {
+test('the Secret Word can be shown and hidden again', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
   await ReactTestRenderer.act(async () => {
     renderer = ReactTestRenderer.create(
@@ -27,12 +27,12 @@ test('the secret key can be shown and hidden again', async () => {
   expect(secretInput().props.secureTextEntry).toBe(true);
 
   await ReactTestRenderer.act(async () => {
-    toggle('Show secret key').props.onPress();
+    toggle('Show Secret Word').props.onPress();
   });
   expect(secretInput().props.secureTextEntry).toBe(false);
 
   await ReactTestRenderer.act(async () => {
-    toggle('Hide secret key').props.onPress();
+    toggle('Hide Secret Word').props.onPress();
   });
   expect(secretInput().props.secureTextEntry).toBe(true);
 });

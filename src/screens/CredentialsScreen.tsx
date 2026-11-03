@@ -19,7 +19,7 @@ export function CredentialsScreen({
       <Text style={styles.title}>ROOK SDK Link Tester</Text>
       <Section
         title="Sandbox credentials"
-        description="Use the client UUID and secret key of a SANDBOX client from the ROOK Portal. They are stored only on this device, never in the repository."
+        description="Use a SANDBOX client from the ROOK Portal. First, on Set up → SDK Authentication, set the Android package name to com.sdklinkapp and create a Secret Word. The Secret Word is not the API secret key from Credentials. Both values are stored only on this device, never in the repository."
       >
         <Field
           label="Client UUID"
@@ -28,7 +28,7 @@ export function CredentialsScreen({
           placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
         />
         <Field
-          label="Secret key"
+          label="Secret Word (from SDK Authentication)"
           value={secret}
           onChangeText={setSecret}
           secureTextEntry={!showSecret}
@@ -39,7 +39,7 @@ export function CredentialsScreen({
           style={styles.toggle}
         >
           <Text style={styles.toggleText}>
-            {showSecret ? 'Hide secret key' : 'Show secret key'}
+            {showSecret ? 'Hide Secret Word' : 'Show Secret Word'}
           </Text>
         </Pressable>
         <Button

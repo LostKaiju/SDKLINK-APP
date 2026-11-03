@@ -26,9 +26,20 @@ outcome shows up as an `event …` line in the log (from `RookSdk.onRookMessage`
 
 ## Credentials
 
-On first launch the app asks for a **sandbox** client UUID and secret key from the ROOK Portal.
-Following ROOK's guidance, they are not stored in source or `.env` files. The app keeps them only on
-the device (AsyncStorage). Use sandbox credentials only.
+On first launch the app asks for a **sandbox** client UUID and **Secret Word**.
+
+Before that, set up the SDK in the ROOK Portal (sandbox): go to **Set up → SDK Authentication**,
+click **Configure credentials**, and:
+
+1. Set **Package Name (Android)** to `com.sdklinkapp`.
+2. Create a **Secret Word** and keep a copy. The Portal shows it only once.
+
+The Secret Word is **not** the API secret key from the Credentials page. If the package name is
+missing or you enter the API secret key, the SDK fails to start with `HCNotAuthorizedException`
+("Requested operation needs an authorization level that your clientUUID doesn't have").
+
+Following ROOK's guidance, these values are not stored in source or `.env` files. The app keeps them
+only on the device (AsyncStorage). Use sandbox credentials only.
 
 ## One-time machine setup (Windows)
 

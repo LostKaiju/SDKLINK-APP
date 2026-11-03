@@ -24,6 +24,17 @@ its own button, and every SDK result and event is shown in an on-screen log.
 Permission requests resolve once the dialog is **shown**, not when the user answers. The actual
 outcome shows up as an `event …` line in the log (from `RookSdk.onRookMessage`).
 
+Any failed call also raises a floating red banner at the bottom of the screen, with a **View log**
+button, so errors aren't missed while the log is scrolled out of view.
+
+### user_id format
+
+Use **letters and numbers only**, 1–50 characters (for example `sdklinktest001`). Measured on
+2026-11-02 against sandbox: the SDK's `POST /api/v1/create-user` returned `422 "The user_id is
+invalid"` for `sdklink_test_001` and `sdklink-test-001`, and `201` for `sdklinktest001`. The
+public API reference allows hyphens (`^[a-zA-Z0-9\-]{1,50}$`), but this endpoint doesn't. In the
+app, the failure surfaces as `HCUserNotInitializedException`.
+
 ## Credentials
 
 On first launch the app asks for a **sandbox** client UUID and **Secret Word**.
@@ -72,13 +83,19 @@ npm run android
 
 Metro (the JS bundler) starts automatically. You can also start it yourself with `npm start`.
 
-## Samsung Health (optional)
+## Samsung Health Data SDK (required)
 
-1. Download `samsung-health-data-api-1.1.0.aar` from Samsung (linked on ROOK's
+The app needs `samsung-health-data-api-1.1.0.aar` even on phones without Samsung Health.
+ROOK's SDK checks Samsung Health availability during startup. Without this file, startup fails
+with `NoClassDefFoundError` (`com/samsung/android/sdk/health/data/permission/Permission`).
+
+1. Download `samsung-health-data-api-1.1.0.aar` from the link on ROOK's
    [Getting Started](https://docs.tryrook.io/docs/rookconnect/sdk/reactnative/fundamentals/gettingstarted/)
-   page) and place it in `android/libs/`. The build picks it up automatically, and the file is
-   git-ignored.
-2. In the Samsung Health app on the phone, turn on developer mode.
+   page.
+2. Place it in `android/libs/`. The file is git-ignored, and the build stops with an error if
+   it's missing.
+
+To test Samsung Health on a Samsung phone, also turn on developer mode in the Samsung Health app.
 
 ## Checks
 

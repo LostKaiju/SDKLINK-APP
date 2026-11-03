@@ -1,5 +1,14 @@
 import React from 'react';
-import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Linking,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {
   APIDataSource,
   RookSdk,
@@ -40,10 +49,22 @@ export function LinkingScreen({
     AuthorizedSource[]
   >([]);
   const [log, setLog] = React.useState<LogEntry[]>([]);
+  // Errors the tester hasn't seen yet; the log sits at the bottom of a long
+  // screen, so a floating banner points to it.
+  const [unseenErrors, setUnseenErrors] = React.useState(0);
+  const [latestError, setLatestError] = React.useState('');
+
+  const scrollRef = React.useRef<ScrollView>(null);
+  const logY = React.useRef(0);
+  const viewportHeight = React.useRef(0);
 
   const ready = configuration.ready;
 
   const addLog = React.useCallback((text: string, isError = false) => {
+    if (isError) {
+      setUnseenErrors(count => count + 1);
+      setLatestError(text);
+    }
     setLog(prev =>
       [
         {
@@ -122,348 +143,440 @@ export function LinkingScreen({
 
   const hasUser = ready && linkedUserID.length > 0;
 
+  const markErrorsSeen = () => setUnseenErrors(0);
+
+  const scrollToLog = () => {
+    scrollRef.current?.scrollTo({ y: logY.current, animated: true });
+    markErrorsSeen();
+  };
+
+  // Scrolling the log into view counts as having seen the errors.
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const bottom = event.nativeEvent.contentOffset.y + viewportHeight.current;
+    if (unseenErrors > 0 && bottom >= logY.current + 80) {
+      markErrorsSeen();
+    }
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>ROOK SDK Link Tester</Text>
-        <Text style={[styles.status, ready ? styles.ok : styles.pending]}>
-          {ready ? 'SDK ready (sandbox)' : 'Initializing SDK…'}
+    <View style={styles.root}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.container}
+        onLayout={event => {
+          viewportHeight.current = event.nativeEvent.layout.height;
+        }}
+        onScroll={handleScroll}
+        scrollEventThrottle={100}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>ROOK SDK Link Tester</Text>
+          <Text style={[styles.status, ready ? styles.ok : styles.pending]}>
+            {ready ? 'SDK ready (sandbox)' : 'Initializing SDK…'}
+          </Text>
+        </View>
+
+        <Section
+          step={1}
+          title="Link a user"
+          description="Set the user_id ROOK will deliver data under: 1–50 letters and numbers only. The SDK's create-user call rejects hyphens and underscores. Changing it resets the sync state."
+        >
+          <Field
+            label="user_id"
+            value={userID}
+            onChangeText={setUserID}
+            placeholder="test-user-001"
+            maxLength={50}
+          />
+          <Row>
+            <Button
+              title="updateUserID"
+              disabled={!ready || userID.trim().length === 0}
+              onPress={linkUser}
+            />
+            <Button
+              title="getUserID"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() => run('getUserID', configuration.getUserID)}
+            />
+            <Button
+              title="syncUserTimeZone"
+              variant="secondary"
+              disabled={!hasUser}
+              onPress={() =>
+                run('syncUserTimeZone', configuration.syncUserTimeZone)
+              }
+            />
+          </Row>
+        </Section>
+
+        <Section
+          step={2}
+          title="Health Connect"
+          description="Requires the Health Connect app on the device (built in on Android 14+)."
+        >
+          <Row>
+            <Button
+              title="Check availability"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run(
+                  'checkHealthConnectAvailability',
+                  permissions.checkHealthConnectAvailability,
+                )
+              }
+            />
+            <Button
+              title="Request permissions"
+              disabled={!hasUser}
+              onPress={() =>
+                run(
+                  'requestHealthConnectPermissions',
+                  permissions.requestHealthConnectPermissions,
+                )
+              }
+            />
+            <Button
+              title="Has permissions?"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run(
+                  'healthConnectHasPermissions',
+                  permissions.healthConnectHasPermissions,
+                )
+              }
+            />
+            <Button
+              title="Background read status"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run(
+                  'checkHealthConnectBackgroundReadStatus',
+                  permissions.checkHealthConnectBackgroundReadStatus,
+                )
+              }
+            />
+            <Button
+              title="History read status"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run(
+                  'checkHistoryReadStatus',
+                  permissions.checkHistoryReadStatus,
+                )
+              }
+            />
+            <Button
+              title="Open settings"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run(
+                  'openHealthConnectSettings',
+                  permissions.openHealthConnectSettings,
+                )
+              }
+            />
+          </Row>
+          <Row>
+            <Button
+              title="Schedule background sync"
+              disabled={!hasUser}
+              onPress={() =>
+                run(
+                  'scheduleBackgroundSync',
+                  healthConnect.scheduleBackgroundSync,
+                )
+              }
+            />
+            <Button
+              title="Cancel"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run('cancelBackgroundSync', healthConnect.cancelBackgroundSync)
+              }
+            />
+            <Button
+              title="Enabled?"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run(
+                  'isBackgroundSyncEnabled',
+                  healthConnect.isBackgroundSyncEnabled,
+                )
+              }
+            />
+          </Row>
+        </Section>
+
+        <Section
+          step={3}
+          title="Samsung Health"
+          description="Needs the Samsung Health Data SDK .aar in android/libs and Samsung Health developer mode on the phone."
+        >
+          <Row>
+            <Button
+              title="Check availability"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run(
+                  'checkSamsungAvailability',
+                  permissions.checkSamsungAvailability,
+                )
+              }
+            />
+            <Button
+              title="Request permissions"
+              disabled={!hasUser}
+              onPress={() =>
+                run(
+                  'requestSamsungHealthPermissions',
+                  permissions.requestSamsungHealthPermissions,
+                )
+              }
+            />
+            <Button
+              title="Has permissions?"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run(
+                  'samsungHealthHasPermissions',
+                  permissions.samsungHealthHasPermissions,
+                )
+              }
+            />
+          </Row>
+          <Row>
+            <Button
+              title="Enable sync"
+              disabled={!hasUser}
+              onPress={() =>
+                run('enableSamsungSync', samsung.enableSamsungSync)
+              }
+            />
+            <Button
+              title="Disable"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run('disableSamsungSync', samsung.disableSamsungSync)
+              }
+            />
+            <Button
+              title="Enabled?"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run('isSamsungSyncEnabled', samsung.isSamsungSyncEnabled)
+              }
+            />
+          </Row>
+        </Section>
+
+        <Section
+          step={4}
+          title="Sync and diagnose"
+          description="Manual sync uploads the last 29 days. Health Connect has a daily read quota, so avoid repeating it many times."
+        >
+          <Row>
+            <Button
+              title="Sync now"
+              disabled={!hasUser}
+              onPress={() =>
+                new Promise<void>(resolve => {
+                  addLog('sync() started');
+                  sync(result => {
+                    addLog(`sync() → ${JSON.stringify(result)}`);
+                    resolve();
+                  });
+                })
+              }
+            />
+            <Button
+              title="Diagnose Health Connect"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run('getDiagnosticState(HEALTH_CONNECT)', () =>
+                  configuration.getDiagnosticState(
+                    SDKDataSource.HEALTH_CONNECT,
+                  ),
+                )
+              }
+            />
+            <Button
+              title="Diagnose Samsung"
+              variant="secondary"
+              disabled={!ready}
+              onPress={() =>
+                run('getDiagnosticState(SAMSUNG_HEALTH)', () =>
+                  configuration.getDiagnosticState(
+                    SDKDataSource.SAMSUNG_HEALTH,
+                  ),
+                )
+              }
+            />
+          </Row>
+        </Section>
+
+        <Section
+          step={5}
+          title="API data sources"
+          description="Opens the provider's login in the browser. Return to the app and refresh to see the new status."
+        >
+          <Button
+            title="Refresh authorized sources"
+            variant="secondary"
+            disabled={!hasUser}
+            onPress={refreshAPISources}
+          />
+          {Object.values(APIDataSource).map(dataSource => {
+            const status = authorizedSources.find(
+              source => source.name.toLowerCase() === dataSource.toLowerCase(),
+            );
+            return (
+              <View key={dataSource} style={styles.sourceRow}>
+                <Text style={styles.sourceName}>
+                  {dataSource}
+                  {status
+                    ? status.authorized
+                      ? '  ✓ linked'
+                      : '  not linked'
+                    : ''}
+                </Text>
+                <Row>
+                  <Button
+                    title="Connect"
+                    disabled={!hasUser}
+                    onPress={() => connectAPISource(dataSource)}
+                  />
+                  <Button
+                    title="Revoke"
+                    variant="secondary"
+                    disabled={!hasUser}
+                    onPress={() =>
+                      run(`revokeDataSource(${dataSource})`, () =>
+                        apiSources.revokeDataSource(linkedUserID, dataSource),
+                      )
+                    }
+                  />
+                </Row>
+              </View>
+            );
+          })}
+        </Section>
+
+        <Section step={6} title="Unlink">
+          <Row>
+            <Button
+              title="removeUserFromRook"
+              variant="danger"
+              disabled={!hasUser}
+              onPress={() =>
+                run('removeUserFromRook', () =>
+                  configuration.removeUserFromRook(ANDROID_SOURCES),
+                )
+              }
+            />
+            <Button
+              title="Change credentials"
+              variant="secondary"
+              onPress={onResetCredentials}
+            />
+          </Row>
+        </Section>
+
+        <View
+          onLayout={event => {
+            logY.current = event.nativeEvent.layout.y;
+          }}
+        >
+          <Section title="Log">
+            <Button
+              title="Clear"
+              variant="secondary"
+              onPress={() => {
+                setLog([]);
+                markErrorsSeen();
+              }}
+            />
+            {log.length === 0 ? (
+              <Text style={styles.logEmpty}>
+                SDK results and events appear here.
+              </Text>
+            ) : (
+              log.map(entry => (
+                <Text
+                  key={entry.id}
+                  style={[styles.logLine, entry.isError && styles.logError]}
+                >
+                  {entry.time} {entry.text}
+                </Text>
+              ))
+            )}
+          </Section>
+        </View>
+      </ScrollView>
+      {unseenErrors > 0 ? (
+        <ErrorBanner
+          count={unseenErrors}
+          message={latestError}
+          onView={scrollToLog}
+          onDismiss={markErrorsSeen}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function ErrorBanner({
+  count,
+  message,
+  onView,
+  onDismiss,
+}: {
+  count: number;
+  message: string;
+  onView: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <View style={styles.banner} accessibilityRole="alert">
+      <View style={styles.bannerTextBox}>
+        <Text style={styles.bannerTitle}>
+          {count === 1 ? '1 error in the log' : `${count} errors in the log`}
+        </Text>
+        <Text style={styles.bannerMessage} numberOfLines={2}>
+          {message}
         </Text>
       </View>
-
-      <Section
-        step={1}
-        title="Link a user"
-        description="Set the user_id (1–50 chars) ROOK will deliver data under. Changing it resets the sync state."
+      <Pressable accessibilityRole="button" onPress={onView} hitSlop={8}>
+        <Text style={styles.bannerAction}>View log</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss error alert"
+        onPress={onDismiss}
+        hitSlop={8}
       >
-        <Field
-          label="user_id"
-          value={userID}
-          onChangeText={setUserID}
-          placeholder="test-user-001"
-          maxLength={50}
-        />
-        <Row>
-          <Button
-            title="updateUserID"
-            disabled={!ready || userID.trim().length === 0}
-            onPress={linkUser}
-          />
-          <Button
-            title="getUserID"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() => run('getUserID', configuration.getUserID)}
-          />
-          <Button
-            title="syncUserTimeZone"
-            variant="secondary"
-            disabled={!hasUser}
-            onPress={() =>
-              run('syncUserTimeZone', configuration.syncUserTimeZone)
-            }
-          />
-        </Row>
-      </Section>
-
-      <Section
-        step={2}
-        title="Health Connect"
-        description="Requires the Health Connect app on the device (built in on Android 14+)."
-      >
-        <Row>
-          <Button
-            title="Check availability"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run(
-                'checkHealthConnectAvailability',
-                permissions.checkHealthConnectAvailability,
-              )
-            }
-          />
-          <Button
-            title="Request permissions"
-            disabled={!hasUser}
-            onPress={() =>
-              run(
-                'requestHealthConnectPermissions',
-                permissions.requestHealthConnectPermissions,
-              )
-            }
-          />
-          <Button
-            title="Has permissions?"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run(
-                'healthConnectHasPermissions',
-                permissions.healthConnectHasPermissions,
-              )
-            }
-          />
-          <Button
-            title="Background read status"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run(
-                'checkHealthConnectBackgroundReadStatus',
-                permissions.checkHealthConnectBackgroundReadStatus,
-              )
-            }
-          />
-          <Button
-            title="History read status"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run('checkHistoryReadStatus', permissions.checkHistoryReadStatus)
-            }
-          />
-          <Button
-            title="Open settings"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run(
-                'openHealthConnectSettings',
-                permissions.openHealthConnectSettings,
-              )
-            }
-          />
-        </Row>
-        <Row>
-          <Button
-            title="Schedule background sync"
-            disabled={!hasUser}
-            onPress={() =>
-              run(
-                'scheduleBackgroundSync',
-                healthConnect.scheduleBackgroundSync,
-              )
-            }
-          />
-          <Button
-            title="Cancel"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run('cancelBackgroundSync', healthConnect.cancelBackgroundSync)
-            }
-          />
-          <Button
-            title="Enabled?"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run(
-                'isBackgroundSyncEnabled',
-                healthConnect.isBackgroundSyncEnabled,
-              )
-            }
-          />
-        </Row>
-      </Section>
-
-      <Section
-        step={3}
-        title="Samsung Health"
-        description="Needs the Samsung Health Data SDK .aar in android/libs and Samsung Health developer mode on the phone."
-      >
-        <Row>
-          <Button
-            title="Check availability"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run(
-                'checkSamsungAvailability',
-                permissions.checkSamsungAvailability,
-              )
-            }
-          />
-          <Button
-            title="Request permissions"
-            disabled={!hasUser}
-            onPress={() =>
-              run(
-                'requestSamsungHealthPermissions',
-                permissions.requestSamsungHealthPermissions,
-              )
-            }
-          />
-          <Button
-            title="Has permissions?"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run(
-                'samsungHealthHasPermissions',
-                permissions.samsungHealthHasPermissions,
-              )
-            }
-          />
-        </Row>
-        <Row>
-          <Button
-            title="Enable sync"
-            disabled={!hasUser}
-            onPress={() => run('enableSamsungSync', samsung.enableSamsungSync)}
-          />
-          <Button
-            title="Disable"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run('disableSamsungSync', samsung.disableSamsungSync)
-            }
-          />
-          <Button
-            title="Enabled?"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run('isSamsungSyncEnabled', samsung.isSamsungSyncEnabled)
-            }
-          />
-        </Row>
-      </Section>
-
-      <Section
-        step={4}
-        title="Sync and diagnose"
-        description="Manual sync uploads the last 29 days. Health Connect has a daily read quota, so avoid repeating it many times."
-      >
-        <Row>
-          <Button
-            title="Sync now"
-            disabled={!hasUser}
-            onPress={() =>
-              new Promise<void>(resolve => {
-                addLog('sync() started');
-                sync(result => {
-                  addLog(`sync() → ${JSON.stringify(result)}`);
-                  resolve();
-                });
-              })
-            }
-          />
-          <Button
-            title="Diagnose Health Connect"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run('getDiagnosticState(HEALTH_CONNECT)', () =>
-                configuration.getDiagnosticState(SDKDataSource.HEALTH_CONNECT),
-              )
-            }
-          />
-          <Button
-            title="Diagnose Samsung"
-            variant="secondary"
-            disabled={!ready}
-            onPress={() =>
-              run('getDiagnosticState(SAMSUNG_HEALTH)', () =>
-                configuration.getDiagnosticState(SDKDataSource.SAMSUNG_HEALTH),
-              )
-            }
-          />
-        </Row>
-      </Section>
-
-      <Section
-        step={5}
-        title="API data sources"
-        description="Opens the provider's login in the browser. Return to the app and refresh to see the new status."
-      >
-        <Button
-          title="Refresh authorized sources"
-          variant="secondary"
-          disabled={!hasUser}
-          onPress={refreshAPISources}
-        />
-        {Object.values(APIDataSource).map(dataSource => {
-          const status = authorizedSources.find(
-            source => source.name.toLowerCase() === dataSource.toLowerCase(),
-          );
-          return (
-            <View key={dataSource} style={styles.sourceRow}>
-              <Text style={styles.sourceName}>
-                {dataSource}
-                {status
-                  ? status.authorized
-                    ? '  ✓ linked'
-                    : '  not linked'
-                  : ''}
-              </Text>
-              <Row>
-                <Button
-                  title="Connect"
-                  disabled={!hasUser}
-                  onPress={() => connectAPISource(dataSource)}
-                />
-                <Button
-                  title="Revoke"
-                  variant="secondary"
-                  disabled={!hasUser}
-                  onPress={() =>
-                    run(`revokeDataSource(${dataSource})`, () =>
-                      apiSources.revokeDataSource(linkedUserID, dataSource),
-                    )
-                  }
-                />
-              </Row>
-            </View>
-          );
-        })}
-      </Section>
-
-      <Section step={6} title="Unlink">
-        <Row>
-          <Button
-            title="removeUserFromRook"
-            variant="danger"
-            disabled={!hasUser}
-            onPress={() =>
-              run('removeUserFromRook', () =>
-                configuration.removeUserFromRook(ANDROID_SOURCES),
-              )
-            }
-          />
-          <Button
-            title="Change credentials"
-            variant="secondary"
-            onPress={onResetCredentials}
-          />
-        </Row>
-      </Section>
-
-      <Section title="Log">
-        <Button title="Clear" variant="secondary" onPress={() => setLog([])} />
-        {log.length === 0 ? (
-          <Text style={styles.logEmpty}>
-            SDK results and events appear here.
-          </Text>
-        ) : (
-          log.map(entry => (
-            <Text
-              key={entry.id}
-              style={[styles.logLine, entry.isError && styles.logError]}
-            >
-              {entry.time} {entry.text}
-            </Text>
-          ))
-        )}
-      </Section>
-    </ScrollView>
+        <Text style={styles.bannerAction}>✕</Text>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 48 },
+  root: { flex: 1 },
+  container: { padding: 16, paddingBottom: 120 },
   header: { marginBottom: 16 },
   title: { fontSize: 22, fontWeight: '700', color: colors.text },
   status: { marginTop: 4, fontSize: 13, fontWeight: '600' },
@@ -479,4 +592,22 @@ const styles = StyleSheet.create({
   logEmpty: { color: colors.muted, fontSize: 13 },
   logLine: { fontFamily: 'monospace', fontSize: 11, color: colors.text },
   logError: { color: colors.danger },
+  banner: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.danger,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    elevation: 6,
+  },
+  bannerTextBox: { flex: 1 },
+  bannerTitle: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  bannerMessage: { color: '#FFF', fontSize: 12, marginTop: 2 },
+  bannerAction: { color: '#FFF', fontWeight: '700', fontSize: 14 },
 });

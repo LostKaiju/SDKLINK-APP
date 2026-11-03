@@ -119,10 +119,12 @@ dependencies {
         implementation jscFlavor
     }
 
-    // Samsung Health Data SDK, required by ROOK for Samsung Health. Download it from
-    // Samsung (link in the ROOK RN Getting Started page) into android/libs/.
+    // Samsung Health Data SDK. Required on every device: ROOK's initRook checks Samsung
+    // Health availability and fails with NoClassDefFoundError without it. Download it
+    // from ROOK's RN Getting Started page into android/libs/ (git-ignored).
     def samsungHealthAar = file("$rootDir/libs/samsung-health-data-api-1.1.0.aar")
-    if (samsungHealthAar.exists()) {
-        implementation files(samsungHealthAar)
+    if (!samsungHealthAar.exists()) {
+        throw new GradleException("Missing ${samsungHealthAar}. See README > Samsung Health Data SDK.")
     }
+    implementation files(samsungHealthAar)
 }

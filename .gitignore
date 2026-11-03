@@ -76,3 +76,6 @@ yarn-error.log
 
 # Samsung Health Data SDK (download from Samsung, do not commit)
 android/libs/*.aar
+
+# ROOK AI skills (from RookeriesDevelopment/rook-skills, no licence file; kept local)
+.claude/skills/rook-*/
